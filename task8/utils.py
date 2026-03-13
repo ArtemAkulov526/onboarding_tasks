@@ -46,44 +46,6 @@ async def random_mouse_move(page: Page, steps: int = 5) -> None:
         await page.mouse.move(random.randint(100, vp["width"] - 100), random.randint(100, vp["height"] - 100))
         await asyncio.sleep(random.uniform(0.05, 0.20))
 
-
-async def solve_recaptcha_v2(page: Page, api_key: str, logger: logging.Logger) -> bool:
-    try:
-        from twocaptcha import TwoCaptcha
-    except ImportError:
-        logger.error("pip install twocaptcha-solver")
-        return False
-    sitekey = await page.evaluate("() => document.querySelector('[data-sitekey]')?.getAttribute('data-sitekey')")
-    if not sitekey:
-        return False
-    try:
-        token = TwoCaptcha(api_key).recaptcha(sitekey=sitekey, url=page.url)["code"]
-        await page.evaluate("""(token) => {
-            const ta = document.getElementById('g-recaptcha-response');
-            if (ta) { ta.innerHTML = token; ta.style.display = 'block'; }
-            const keys = Object.keys(___grecaptcha_cfg?.clients || {});
-            if (keys.length) {
-                const cb = ___grecaptcha_cfg.clients[keys[0]]?.O?.b?.callback
-                        || ___grecaptcha_cfg.clients[keys[0]]?.l?.b?.callback;
-                if (typeof cb === 'function') cb(token);
-            }
-        }""", token)
-        await human_delay(1500, 3000)
-        return True
-    except Exception as e:
-        logger.error(f"2captcha error: {e}")
-        return False
-
-
-async def handle_captcha_if_present(page: Page, api_key: str, logger: logging.Logger) -> None:
-    for sel in ["iframe[src*='recaptcha']", ".g-recaptcha", "[data-sitekey]"]:
-        if await page.query_selector(sel):
-            logger.warning(f"Captcha: {sel}")
-            if await solve_recaptcha_v2(page, api_key, logger):
-                await page.wait_for_load_state("networkidle", timeout=15000)
-            break
-
-
 def parse_hotel_card(card_data: dict) -> Optional[dict]:
     name = card_data.get("name", "").strip()
     if not name:

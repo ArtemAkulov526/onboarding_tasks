@@ -1,27 +1,20 @@
 import asyncio
 import json
 import logging
-import os
 from datetime import datetime, timezone
-from dotenv import load_dotenv
 
 from playwright.async_api import async_playwright, BrowserContext
 from playwright_stealth import Stealth
 
 from utils import (
     get_logger, parse_proxy_url, human_delay, random_mouse_move,
-    handle_captcha_if_present, extract_hotels_from_page,
-    scroll_until_more_cards, add_hotels,
+    extract_hotels_from_page, scroll_until_more_cards, add_hotels,
 )
 
-load_dotenv()
-
-TWOCAPTCHA_API_KEY = os.getenv("TWOCAPTCHA_API_KEY")
-
 PROXIES = {
-    "london": "ip:port:username:password",
-    "paris":  "ip:port:username:password",
-    "berlin": "ip:port:username:password",
+    "london": "150.241.117.137:5641:ghetdrsf:odkcght6xgs5",
+    "paris": "166.0.36.197:6206:ghetdrsf:odkcght6xgs5",
+    "berlin": "207.228.29.0:5491:ghetdrsf:odkcght6xgs5"
 }
 
 TARGET_HOTELS_PER_CITY = 30
@@ -93,7 +86,6 @@ async def scrape_city(city_key: str, city_info: dict, pw, semaphore: asyncio.Sem
         try:
             await page.goto(city_info["url"], wait_until="domcontentloaded", timeout=45000)
             await human_delay(2000, 4000)
-            await handle_captcha_if_present(page, TWOCAPTCHA_API_KEY, logger)
             await random_mouse_move(page, steps=4)
             await human_delay(500, 1200)
 
