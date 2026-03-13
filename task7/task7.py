@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from curl_cffi import requests as requests
+from curl_cffi import requests
 from curl_cffi.requests import AsyncSession
 import psutil
 import json
