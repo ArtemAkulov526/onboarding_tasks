@@ -12,9 +12,9 @@ from utils import (
 )
 
 PROXIES = {
-    "london": "150.241.117.137:5641:ghetdrsf:odkcght6xgs5",
-    "paris": "166.0.36.197:6206:ghetdrsf:odkcght6xgs5",
-    "berlin": "207.228.29.0:5491:ghetdrsf:odkcght6xgs5"
+    "london": "ip:port:user:password",
+    "paris": "ip:port:user:password",
+    "berlin": "ip:port:user:password"
 }
 
 TARGET_HOTELS_PER_CITY = 30
