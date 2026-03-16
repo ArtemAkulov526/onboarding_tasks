@@ -1,4 +1,5 @@
 from curl_cffi import requests, AsyncSession
+from parsel import Selector
 import logging
 import time
 import random
@@ -30,6 +31,11 @@ def is_blocked(html: str) -> list[str]:
     if triggered:
         logger.debug(f"triggered_markers: {triggered}")
     return triggered
+
+def count_items(html: str) -> int:
+    sel = Selector(text=html)
+    items = sel.css("ul.srp-results li.s-card").getall()
+    return len(items)
 
 class RPS:
     proxies = ["ip:port:username:password",
@@ -93,10 +99,16 @@ class RPS:
                 proxy=self.get_random_proxy(),
                 timeout=15,
             )
+            html = resp.text
+            if page == 1:
+                with open("debug_page.html", "w", encoding="utf-8") as f:
+                    f.write(resp.text)
+
             result["elapsed"] = round(time.time() - start_time, 3)
             result["status"] = resp.status_code
             result["size_bytes"] = len(resp.content)
-            result["blocked"] = is_blocked(resp.text)
+            result["blocked"] = is_blocked(html)
+            result["items_count"] = count_items(html)
 
             blocker = None
             if resp.status_code == 503:
@@ -107,12 +119,15 @@ class RPS:
                 blocker = f"Small response ({result['size_bytes']} bytes)"
             elif result["blocked"]:
                 blocker = f"Blocked by markers: {result['blocked']}"
+            elif result["items_count"] == 0:
+                blocker = f"Soft ban: 200 OK but 0 items on page"
 
             log_fn = logger.warning if blocker else logger.info
             log_fn(
                 f"[{rps} req/s | page{page:>3}] "
                 f"Status_code: {result['status']} | "
                 f"Response_size: {result['size_bytes']} | "
+                f"Items: {result['items_count']} | "
                 f"Time_of_request: {result['elapsed']}s"
                 + (f" |  {blocker}" if blocker else "")
             )
@@ -161,16 +176,35 @@ class RPS:
 
             await asyncio.gather(*tasks, return_exceptions=True)
 
+        # Агрегация результатов
+        total = len(results)
+        errors = sum(1 for r in results if r["error"] is not None)
+        ok_with_items = sum(
+            1 for r in results
+            if r["error"] is None and r["status"] == 200 and r["items_count"] > 0
+        )
+        soft_ban = sum(
+            1 for r in results
+            if r["error"] is None and r["status"] == 200
+            and (r["items_count"] == 0 or r["blocked"])
+        )
+        other = total - errors - ok_with_items - soft_ban
+
+        logger.info(
+            f"\n--- Phase summary [{rps} req/s] ---\n"
+            f"  Total requests : {total}\n"
+            f"  200 + items    : {ok_with_items}  (clean)\n"
+            f"  200 + soft ban : {soft_ban}  (0 items or blocked markers)\n"
+            f"  Errors         : {errors}\n"
+            f"  Other          : {other}\n"
+            f"----------------------------------"
+        )
+
         return results
 
-    async def benchmark(self):
-        # options for rps = [1.0, 2.0, 5.0]
-        rps = 5.0
-        all_results = {}
-        all_results[rps] = await self.run_phase(rps, duration_seconds=120)
-
-
 if __name__ == "__main__":
+    # options for rps = [1.0, 2.0, 5.0]
+    rps = 2.0
     session = RPS()
-    #session.sync_requests()
-    asyncio.run(session.benchmark())
+    session.sync_requests()
+    asyncio.run(session.run_phase(rps, duration_seconds=120))
